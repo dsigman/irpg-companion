@@ -1,4 +1,4 @@
-const APP_VERSION = '5 (' + window.DATA_VERSION + ')';
+const APP_VERSION = '6 (' + window.DATA_VERSION + ')';
 const view = document.getElementById('view');
 const titleEl = document.getElementById('title');
 const KEY = 'irpg-favorites';
@@ -104,7 +104,7 @@ function homeHtml(q) {
   html += `<p><a class="fav-link" href="#/favorites">★ Favorites (${favs})</a></p>`;
   for (const c of categories) {
     const items = match.filter(s => s.category === c);
-    if (items.length) html += `<details ${q ? 'open' : ''}><summary>${esc(c)} <span class="count">${items.length}</span></summary>${listHtml(items)}</details>`;
+    if (items.length) html += `<details ${q ? 'open' : ''}><summary><span class="cico" aria-hidden="true">${ICONS[c] || '📄'}</span>${esc(c)} <span class="count">${items.length}</span></summary>${listHtml(items)}</details>`;
   }
   return html;
 }
@@ -130,7 +130,7 @@ function render() {
       (hasChecks ? `<button class="clear-btn" data-clear="${s.id}">Clear checkmarks</button>` : '') + jump + `<p class="src">${esc(s.category)} · IRPG ${/^(\d+|[ivx]+)(–|$)/.test(s.pages) ? 'p.' : ''} ${esc(s.pages)}</p>` + body +
       `<details class="orig" ${s.openImages && !isForm ? 'open' : ''}><summary>Original printed page${s.images.length > 1 ? 's' : ''} (check against ${isForm ? 'form' : 'text'})</summary>${imgs}</details>`;
   } else {
-    titleEl.textContent = 'IRPG Companion';
+    titleEl.innerHTML = '<img class="logo" src="icons/logo.png" alt="" width="40" height="40"><span>IRPG Companion</span>';
     view.innerHTML = homeHtml(homeQuery) +
       '<footer>Unofficial companion. Content from the NWCG Incident Response Pocket Guide (PMS 461, January 2025), a public domain NWCG publication. Not a substitute for the current guide: confirm at nwcg.gov/publications/pms461.<br>App version ' + APP_VERSION + '</footer>';
   }

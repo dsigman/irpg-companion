@@ -65,3 +65,10 @@ fieldset.mf-g{border:1px solid var(--line);border-radius:10px;margin:12px 0;padd
 a{color:var(--accent)}
 a:visited{color:var(--accent)}
 ul.list a:visited{color:var(--fg)}
+
+.cico{display:inline-block;width:2rem;font-size:1.4rem;line-height:1;vertical-align:middle;margin-right:2px}
+summary{display:flex;align-items:center}
+summary::before{margin-right:6px}
+header h1 .logo{width:40px;height:40px;vertical-align:middle;margin-right:8px;border-radius:50%;background:#fff}
+header h1{display:flex;align-items:center;justify-content:center}
+.count{margin-left:.4em}
