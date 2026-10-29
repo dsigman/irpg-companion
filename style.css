@@ -1,8 +1,8 @@
-:root{--bg:#fff;--fg:#1c1b1f;--muted:#5f5f66;--accent:#b3261e;--card:#f4f1f0;--line:#ddd}
-@media(prefers-color-scheme:dark){:root{--bg:#161214;--fg:#f1ecec;--muted:#b0a9a9;--card:#251f21;--line:#3a3234;--accent:#ff8a80}}
+:root{--hdr:#b3261e;--bg:#fff;--fg:#1c1b1f;--muted:#5f5f66;--accent:#b3261e;--card:#f4f1f0;--line:#ddd}
+@media(prefers-color-scheme:dark){:root{--bg:#161214;--fg:#f1ecec;--muted:#b0a9a9;--card:#251f21;--line:#3a3234;--accent:#ff8a80;--hdr:#8e1b15}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.45 system-ui,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
-header{position:sticky;top:0;display:flex;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;z-index:2}
+header{position:sticky;top:0;display:flex;align-items:center;gap:8px;background:var(--hdr);color:#fff;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;z-index:2}
 header h1{flex:1;margin:0;font-size:1.15rem;text-align:center}
 .icon-btn{color:#fff;text-decoration:none;font-size:26px;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center}
 main{padding:12px 16px;max-width:720px;margin:0 auto}
@@ -62,9 +62,9 @@ fieldset.mf-g{border:1px solid var(--line);border-radius:10px;margin:12px 0;padd
 .mf-remember{background:var(--card);border-radius:8px;padding:8px 12px;margin:14px 0}
 .mf-actions{position:sticky;bottom:0;background:var(--bg);padding:8px 0;border-top:1px solid var(--line)}
 
-a{color:var(--accent)}
-a:visited{color:var(--accent)}
-ul.list a:visited{color:var(--fg)}
+main a,main a:visited{color:var(--accent)}
+ul.list a,ul.list a:visited{color:var(--fg)}
+header a,header a:visited{color:#fff}
 
 .cico{display:inline-block;width:2rem;font-size:1.4rem;line-height:1;vertical-align:middle;margin-right:2px}
 summary{display:flex;align-items:center}
@@ -72,3 +72,9 @@ summary::before{margin-right:6px}
 header h1 .logo{width:40px;height:40px;vertical-align:middle;margin-right:8px;border-radius:50%;background:#fff}
 header h1{display:flex;align-items:center;justify-content:center}
 .count{margin-left:.4em}
+.callout{font-weight:700;border-left:4px solid var(--accent);padding:2px 0 2px 10px;margin:14px 0}
+main{overflow-wrap:anywhere}
+pre.mono{overflow-wrap:normal}
+
+details.orig img.page{display:block}
+details.orig a{display:block}

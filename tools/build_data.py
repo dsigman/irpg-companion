@@ -107,10 +107,9 @@ S = [
  ('medical-report','Medical Incident Report','Emergency Medical Care',120,None),
 ]
 # Sections whose layout is a table/diagram: shown preformatted, plus page images when the content is graphical.
-MONO = {'danger-ratings','winds','wind-estimate','ffm-pig','ffm-behavior','hazmat-isolation','hazmat-fixed','weights',
-        'retardant-coverage','engine-typing','hp-pump','hp-troubleshoot','perimeter-chains','phonetic','triage','forecast',
-        'medical-report','patient-assessment','specific-treatments','heat-injury','burns','weights','aviation-checklist','heli-briefing'}
-IMAGES = {'structure-marking','heli-landing-area','one-way-helispot','two-way-helispot','longline','hand-signals','paracargo',
+MONO = {'danger-ratings','winds','wind-estimate','ffm-pig','ffm-behavior','behavior-obs','hazmat-fixed','weights','retardant-coverage',
+        'engine-typing','hp-pump','hp-troubleshoot','perimeter-chains','phonetic','triage','complexity','patient-assessment','safety-zones','medical-report'}
+IMAGES = {'hazmat-isolation','water-delivery','heavy-equipment','smoke-transport','retardant-reminders','critical-weather','structure-marking','heli-landing-area','one-way-helispot','two-way-helispot','longline','hand-signals','paracargo',
           'wind-estimate','smoke-column','look-up','safety-zones','hazard-tree','hazmat-isolation','triage','burns'}
 SPECIAL = {  # explicit pdf page lists (cover pages share one pdf page)
  'about':[3,138], 'sizeup-report':[2],'briefing-checklist':[139],'fire-orders':[140],'watch-outs':[140],
@@ -137,7 +136,7 @@ for i, s in enumerate(body):
 
 NOISE = [re.compile(p) for p in (
     r'^\s*IRPG(\s+[–-].*)?\s*(\d+\s+of\s+122)?\s*$', r'^\s*IRPG\s+[ivx]+\s*$', r'^\s*\d+\s+of\s+122\s*$',
-    r'^\s*[A-Z ]{4,}\s*\([a-z ]+ pages\)\s*$', r'^\s*\f?\s*$')]
+    r'^\s*[A-Z ]{4,}\s*\([a-z ]+ pages\)\s*$', r'^\s*.{0,40}\([\w ]+pa\s?ges\)\s*$', r'^\s*\f?\s*$')]
 def bold_lines(n):
     # whole-element bold text on the page = headings; layout text lines equal to one of these get marked
     x = subprocess.run(['pdftohtml','-xml','-i','-f',str(n),'-l',str(n),'-stdout',pdf],capture_output=True,text=True,check=True).stdout
@@ -147,24 +146,59 @@ def bold_lines(n):
         if t: found.add(t)
     return found
 
+def bold_labels(n):
+    # a bold lead-in such as 'Determining Factor:' at the start of a line that continues in regular type
+    x = subprocess.run(['pdftohtml','-xml','-i','-f',str(n),'-l',str(n),'-stdout',pdf],capture_output=True,text=True,check=True).stdout
+    found = set()
+    for m in re.finditer(r'<text [^>]*>\s*<b>(.*?)</b>(.+?)</text>', x):
+        lab = ' '.join(re.sub(r'<[^>]+>', '', m.group(1)).replace('&amp;','&').split())
+        rest = re.sub(r'<[^>]+>', '', m.group(2)).strip()
+        if lab.endswith(':') and rest and len(lab) < 60: found.add(lab)
+    return found
+
 def page_text(n, mark=True):
     t = subprocess.run(['pdftotext','-f',str(n),'-l',str(n),'-layout',pdf,'-'],capture_output=True,text=True,check=True).stdout
     lines = [l.rstrip() for l in t.replace('\f','').split('\n')]
     # drop footer/header noise, keep blank lines inside the text
     keep = [l for l in lines if not (l.strip() and any(p.match(l) for p in NOISE))]
     if mark:
-        bold = bold_lines(n)
-        keep = [('\x01' + l.strip()) if ' '.join(l.split()) in bold else l for l in keep]
+        bold = bold_lines(n); labels = bold_labels(n)
+        def tag(l):
+            norm = ' '.join(l.split())
+            if norm in bold: return '\x01' + l.strip()
+            if not re.match(r'\s*[\u2022\u2610\u25a1\u25cb\-\u2013]|\s*\d{1,2}\.\s', l):
+                for lab in labels:
+                    if norm.startswith(lab) and len(norm) > len(lab) + 2: return '\x02' + l.strip()
+            return l
+        keep = [tag(l) for l in keep]
     while keep and not keep[0].strip(): keep.pop(0)
     while keep and not keep[-1].strip(): keep.pop()
     return '\n'.join(keep)
 
+GLYPHS = {'\uf0e8': '\u2192', '\uf0a7': '\u2022'}  # Wingdings arrow and square bullet
+STRUCT = [  # Structure Hazard Marking System: symbols are drawn marks, so describe them in words
+    ('\uf06f\u2044 Structure is significantly', '[Box with one slash] Structure is significantly'),
+    ('\uf06f Structure is safe', '[Empty box] Structure is safe'),
+    ('\uf06f Structure is unsafe', '[Box with X] Structure is unsafe'),
+    ('\uf0cf\n', ''),
+    ('\uf0e7 Entrance', '[Arrow] Entrance'),
+]
 sections = []
 for sid, title, cat, n, kind in S:
     pages = SPECIAL.get(sid) or list(range(pdf_page(n, kind), ends[sid] + 1))
     text = '\n\n'.join(page_text(p, sid not in MONO) for p in pages)
+    if sid not in MONO:
+        L = text.split('\n')
+        first = L[0].strip() if L else ''
+        if first and L[0][0] not in '\x01\x02' and len(first) < 60 and not re.search(r'[.,;]$', first) and not re.match(r'[\u2022\u2610\u25a1\u25cb\-\u2013]\s', first):
+            L[0] = '\x01' + first
+        text = '\n'.join(L)
+        text = re.sub(r'\n+(\x01)?NOTES\s*$', '', text)
+    if sid == 'structure-marking':
+        for a, b in STRUCT: text = text.replace(a, b)
+    for a, b in GLYPHS.items(): text = text.replace(a, b)
     if sid == 'fire-orders': text = text.split('18 WATCH OUT')[0].rstrip()
-    if sid == 'watch-outs': text = '18 WATCH OUT' + text.split('18 WATCH OUT',1)[1]
+    if sid == 'watch-outs': text = '\x0118 WATCH OUT' + text.split('18 WATCH OUT',1)[1]
     sec = {'id': sid, 'title': title, 'category': cat, 'pages': printed(pages[0]) if len(pages)==1 else f'{printed(pages[0])}–{printed(pages[-1])}', 'text': text}
     if sid in MONO: sec['mono'] = True
     sec['images'] = [f'pages/p{p}.jpg' for p in pages]  # printed pages, always shown as a fallback to the extracted text
@@ -179,7 +213,7 @@ for sid, title, cat, n, kind in S:
 (out / 'pages').mkdir(exist_ok=True)
 need = sorted({int(re.search(r'p(\d+)', im).group(1)) for s in sections for im in s.get('images', [])})
 for p in need:
-    subprocess.run(['pdftoppm','-f',str(p),'-l',str(p),'-jpeg','-jpegopt','quality=70','-r','100','-singlefile',pdf,str(out/'pages'/f'p{p}')],check=True)
+    subprocess.run(['pdftoppm','-f',str(p),'-l',str(p),'-jpeg','-jpegopt','quality=72','-r','150','-singlefile',pdf,str(out/'pages'/f'p{p}')],check=True)
 
 import hashlib
 body_json = json.dumps(sections, ensure_ascii=False, indent=1)

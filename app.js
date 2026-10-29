@@ -1,4 +1,4 @@
-const APP_VERSION = '6 (' + window.DATA_VERSION + ')';
+const APP_VERSION = '8 (' + window.DATA_VERSION + ')';
 const view = document.getElementById('view');
 const titleEl = document.getElementById('title');
 const KEY = 'irpg-favorites';
@@ -43,8 +43,15 @@ function itemHtml(s) {
 const listHtml = items => '<ul class="list">' + items.map(itemHtml).join('') + '</ul>';
 
 // Turns the guide's page text into HTML. Bullets/checkboxes/numbers start items, lightly indented lines continue
-// the previous item, and anything else is a heading or paragraph line.
-const BULLET = /^\s{0,10}([•☐□○\-–]|\d{1,2}\.)\s+/;
+// the previous item, bold lines (marked \x01 by the build) are headings, and short lines stay separate paragraphs.
+const BULLET = /^\s{0,10}([•☐□○\-–]|\d{1,2}\.)\s+(?![\-–]?\s*[a-z])/;
+const O_BULLET = /^\s{1,10}o\s+(?=\S)/;  // 'o' used as a sub-bullet glyph
+const HEAD_JOIN_WORDS = /\b(in|of|and|or|the|for|to|on|with|a|an|at|by)$/i;
+function canJoinHeading(prev, next) {
+  return !/[.?!:]$/.test(prev) && !/^\d+[.)]\s/.test(next) && prev !== prev.toUpperCase() &&
+    (/^[a-z]/.test(next) || HEAD_JOIN_WORDS.test(prev) || next.split(/\s+/).length <= 1);
+}
+
 // Splits text on hollow checkbox glyphs: each ☐ starts a tickable item, anything before the first one is plain text.
 function pieces(s) {
   return s.split(/\s*[☐□]\s*/).map((t, i) => ({ t: t.trim(), chk: i > 0 })).filter(p => p.t);
@@ -58,26 +65,47 @@ function flowHtml(text, sid) {
     const i = n++;
     return `<li class="chk${sub ? ' sub' : ''}"><label><input type="checkbox" data-ck="${i}" ${checked.has(i) ? 'checked' : ''}><span>${esc(p.t)}</span></label></li>`;
   };
-  const out = [];
+  const lines = text.split('\n');
+  // typical width of a full wrapped line, so we can tell wrapped lines from short stand-alone lines
+  const lens = lines.filter(l => l.trim() && l[0] !== '\x01' && l[0] !== '\x02').map(l => l.trim().replace(/\s{2,}/g, ' ').length).sort((x, y) => x - y);
+  const full = 0.75 * (lens[Math.floor(lens.length * 0.9)] || 60);
+  const out = [], heads = [];
   let cur = null;
   const flush = () => { if (cur) { out.push(cur); cur = null; } };
-  for (const raw of text.split('\n')) {
+  const nextIsBullet = i => { for (let k = i + 1; k < lines.length; k++) { if (lines[k].trim()) return BULLET.test(lines[k]) || O_BULLET.test(lines[k]); } return false; };
+  for (let i = 0; i < lines.length; i++) {
+    let raw = lines[i];
     if (!raw.trim()) { flush(); continue; }
-    if (raw[0] === '\x01') {  // bold line in the guide = heading; consecutive heading lines are one heading
+    if (raw[0] === '\x01') {  // bold line in the guide = heading; wrapped heading lines are joined
       const t = raw.slice(1).trim();
-      if (cur && cur.t === 'h' && cur.s !== cur.s.toUpperCase()) cur.s += ' ' + t; else { flush(); cur = { t: 'h', s: t }; }
+      if (cur && cur.t === 'h' && canJoinHeading(cur.s, t)) { cur.s += ' ' + t; continue; }
+      if (!cur || cur.t !== 'h') {
+        if (/^[a-z]/.test(t)) { raw = '  ' + t; }  // stray bold fragment: ordinary wrapped text
+        else { flush(); cur = { t: 'h', s: t }; continue; }
+      } else { flush(); cur = { t: 'h', s: t }; continue; }
+    }
+    if (raw[0] === '\x02') {  // paragraph that starts with a bold label
+      flush();
+      const t = raw.slice(1).trim();
+      cur = { t: 'p', s: t, lead: true, last: t.length };
       continue;
     }
     const indent = raw.length - raw.trimStart().length;
-    const line = raw.trim();
-    if (BULLET.test(raw)) {
+    const line = raw.trim().replace(/\s{2,}/g, ' ');
+    if (O_BULLET.test(raw)) {
+      flush();
+      cur = { t: 'li', s: line.replace(/^o\s+/, ''), sub: true };
+    } else if (BULLET.test(raw)) {
       flush();
       cur = { t: 'li', s: line.replace(/^[•○◦\-–]\s+/, ''), sub: /^[○◦\-–]/.test(line) || indent > 2 };
-    } else if (cur && (cur.t === 'p' || (cur.t === 'li' && indent >= 1))) {
-      cur.s += ' ' + line;  // wrapped line of the same bullet (indented) or paragraph
+    } else if (cur && cur.t === 'li' && indent >= 1) {
+      cur.s += ' ' + line;  // wrapped line of the same bullet
+    } else if (cur && cur.t === 'p' && (cur.last >= full || /^[a-z]/.test(line))) {
+      cur.s += ' ' + line; cur.last = line.length;  // wrapped line of the same paragraph
     } else {
       flush();
-      cur = { t: 'p', s: line };
+      if (line.length <= 45 && !/[.;,!?]$/.test(line) && nextIsBullet(i)) cur = { t: 'h', s: line };  // unbolded sub-heading above a list
+      else cur = { t: 'p', s: line, last: line.length };
     }
   }
   flush();
@@ -86,13 +114,21 @@ function flowHtml(text, sid) {
     if (b.t !== 'li' && inList) { html += '</ul>'; inList = false; }
     if (b.t === 'li') {
       if (!inList) { html += '<ul class="flow">'; inList = true; }
-      const [first, ...subs] = b.s.split(/\s*[○◦]\s+/);  // inline hollow-circle markers are sub-bullets
+      // inline markers: extra bullets / sub-bullets
+      const parts = b.s.split(/\s*[○◦]\s+/).flatMap((x, k) => k ? [x] : x.split(/\s+•\s+/)).flatMap((x, k) => k ? [x] : x.split(/\s+o\s+(?=[A-Z])/));
+      const [first, ...subs] = parts;
       html += pieces(first).map(p => liHtml(p, b.sub)).join('') + subs.flatMap(pieces).map(p => liHtml(p, true)).join('');
     }
-    else if (b.t === 'h') html += `<h3>${esc(b.s)}</h3>`;
-    else html += `<p>${esc(b.s)}</p>`;
+    else if (b.t === 'h') {
+      if (b.s.length > 80) html += `<p class="callout">${esc(b.s)}</p>`;
+      else { html += `<h3>${esc(b.s)}</h3>`; heads.push(b.s); }
+    }
+    else {
+      const m = b.lead && b.s.match(/^([^:]{1,60}:)\s+(.*)$/);
+      html += m ? `<p><b>${esc(m[1])}</b> ${esc(m[2])}</p>` : `<p>${esc(b.s)}</p>`;
+    }
   }
-  return html + (inList ? '</ul>' : '');
+  return { html: html + (inList ? '</ul>' : ''), heads };
 }
 
 function homeHtml(q) {
@@ -120,15 +156,26 @@ function render() {
     const s = byId[hash.slice(2)];
     if (!s) { location.hash = '#/'; return; }
     titleEl.textContent = s.title;
-    const imgs = (s.images || []).map(src => `<img class="page" loading="lazy" src="${src}" alt="IRPG page image: ${esc(s.title)}">`).join('');
-    const heads = s.mono ? [] : s.text.split('\n').filter(l => l[0] === '\x01').map(l => l.slice(1).trim());
-    const jump = s.images.length >= 3 && heads.length >= 4 ? '<div class="jump">' + heads.slice(1).map((h, i) => `<button class="chip" data-jump="${esc(h)}">${esc(h)}</button>`).join('') + '</div>' : '';
+    const imgs = (s.images || []).map(src => `<a href="${src}" target="_blank" rel="noopener"><img class="page" loading="lazy" src="${src}" alt="IRPG printed page: ${esc(s.title)}"></a>`).join('');
     const isForm = s.id === 'medical-report' && window.MedForm;
-    const body = isForm ? window.MedForm.html() : s.mono ? `<pre class="mono">${esc(s.text.replace(/[○◦]/g, '-'))}</pre>` : flowHtml(s.text, s.id);
+    const pl = s.images.length > 1 ? 's' : '';
+    let body, heads = [], tail;
+    if (isForm) {  // fill-in form; printed pages collapsed underneath for checking
+      body = window.MedForm.html();
+      tail = `<details class="orig"><summary>Original printed page${pl} (check against form)</summary>${imgs}</details>`;
+    } else if (s.mono) {  // tables / columns: the printed page is the reliable view, extracted text is secondary
+      body = `<details class="orig" open><summary>Printed page${pl} (tap a page to zoom)</summary>${imgs}</details>`;
+      tail = `<details class="orig"><summary>Text version (columns and tables may not line up)</summary><pre class="mono">${esc(s.text.replace(/[\x01\x02]/g, '').replace(/[○◦]/g, '-'))}</pre></details>`;
+    } else {
+      const f = flowHtml(s.text, s.id);
+      body = f.html; heads = f.heads;
+      tail = `<details class="orig" ${s.openImages ? 'open' : ''}><summary>Original printed page${pl} (check against text)</summary>${imgs}</details>`;
+    }
     const hasChecks = !s.mono && /[☐□]/.test(s.text);
+    const jump = s.images.length >= 3 && heads.length >= 4 ? '<div class="jump">' + heads.slice(1).map(h => `<button class="chip" data-jump="${esc(h)}">${esc(h)}</button>`).join('') + '</div>' : '';
     view.innerHTML = `<button class="fav-btn ${isFav(s.id) ? 'on' : ''}" data-id="${s.id}">${isFav(s.id) ? '★ Remove from Favorites' : '☆ Add to Favorites'}</button>` +
-      (hasChecks ? `<button class="clear-btn" data-clear="${s.id}">Clear checkmarks</button>` : '') + jump + `<p class="src">${esc(s.category)} · IRPG ${/^(\d+|[ivx]+)(–|$)/.test(s.pages) ? 'p.' : ''} ${esc(s.pages)}</p>` + body +
-      `<details class="orig" ${s.openImages && !isForm ? 'open' : ''}><summary>Original printed page${s.images.length > 1 ? 's' : ''} (check against ${isForm ? 'form' : 'text'})</summary>${imgs}</details>`;
+      (hasChecks ? `<button class="clear-btn" data-clear="${s.id}">Clear checkmarks</button>` : '') + jump +
+      `<p class="src">${esc(s.category)} · IRPG ${/^(\d+|[ivx]+)(–|$)/.test(s.pages) ? 'p.' : ''} ${esc(s.pages)}</p>` + body + tail;
   } else {
     titleEl.innerHTML = '<img class="logo" src="icons/logo.png" alt="" width="40" height="40"><span>IRPG Companion</span>';
     view.innerHTML = homeHtml(homeQuery) +

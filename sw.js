@@ -1,5 +1,5 @@
 importScripts('data.js');
-const CACHE = 'irpg-' + self.DATA_VERSION + '-v6';
+const CACHE = 'irpg-' + self.DATA_VERSION + '-v8';
 const IMAGES = [...new Set(self.SECTIONS.flatMap(s => s.images || []))];
 const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'medform.js', 'data.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/logo.png', ...IMAGES];
 // 'reload' / 'no-cache' bypass the browser's HTTP cache, so a new release never mixes with stale copies of other files.
