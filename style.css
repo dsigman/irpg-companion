@@ -32,3 +32,6 @@ ul.flow li.sub{margin-left:18px;list-style:circle}
 pre.mono{font:12.5px/1.35 ui-monospace,Menlo,monospace;overflow-x:auto;background:var(--card);padding:10px;border-radius:8px;white-space:pre}
 img.page{width:100%;height:auto;border:1px solid var(--line);border-radius:8px;margin:8px 0}
 details.orig summary{font-size:.9rem;color:var(--muted);font-weight:600}
+.jump{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:16px;padding:6px 12px;font-size:.85rem;cursor:pointer}
+h3{scroll-margin-top:70px}

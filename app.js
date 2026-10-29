@@ -91,9 +91,11 @@ function render() {
     if (!s) { location.hash = '#/'; return; }
     titleEl.textContent = s.title;
     const imgs = (s.images || []).map(src => `<img class="page" loading="lazy" src="${src}" alt="IRPG page image: ${esc(s.title)}">`).join('');
+    const heads = s.mono ? [] : s.text.split('\n').filter(l => l[0] === '\x01').map(l => l.slice(1).trim());
+    const jump = s.images.length >= 3 && heads.length >= 4 ? '<div class="jump">' + heads.slice(1).map((h, i) => `<button class="chip" data-jump="${esc(h)}">${esc(h)}</button>`).join('') + '</div>' : '';
     const body = s.mono ? `<pre class="mono">${esc(s.text)}</pre>` : flowHtml(s.text);
     view.innerHTML = `<button class="fav-btn ${isFav(s.id) ? 'on' : ''}" data-id="${s.id}">${isFav(s.id) ? '★ Remove from Favorites' : '☆ Add to Favorites'}</button>` +
-      `<p class="src">${esc(s.category)} · IRPG PDF page${s.pages.includes('–') ? 's' : ''} ${esc(s.pages)}</p>` + body +
+      jump + `<p class="src">${esc(s.category)} · IRPG ${/^(\d+|[ivx]+)(–|$)/.test(s.pages) ? 'p.' : ''} ${esc(s.pages)}</p>` + body +
       `<details class="orig" ${s.openImages ? 'open' : ''}><summary>Original printed page${s.images.length > 1 ? 's' : ''} (check against text)</summary>${imgs}</details>`;
   } else {
     titleEl.textContent = 'IRPG Companion';
@@ -104,6 +106,12 @@ function render() {
 }
 
 view.addEventListener('click', e => {
+  const j = e.target.closest('button[data-jump]');
+  if (j) {
+    const h = [...view.querySelectorAll('h3')].find(x => x.textContent.trim().startsWith(j.dataset.jump.slice(0, 40)));
+    if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
   const b = e.target.closest('button[data-id]');
   if (!b) return;
   toggleFav(b.dataset.id);

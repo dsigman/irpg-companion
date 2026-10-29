@@ -15,6 +15,7 @@ S = [
  ('briefing-checklist','Briefing Checklist','Quick Reference',139,None),
  ('fire-orders','10 Standard Firefighting Orders','Quick Reference',140,None),
  ('watch-outs','18 Watch Out Situations','Quick Reference',140,None),
+ ('about','About this Guide / Publication Information','Quick Reference',3,None),
  ('op-leadership','Operational Leadership','Operational Leadership',5,'r'),
  ('duty','Duty','Operational Leadership',6,'r'),
  ('respect','Respect','Operational Leadership',7,'r'),
@@ -112,8 +113,16 @@ MONO = {'danger-ratings','winds','wind-estimate','ffm-pig','ffm-behavior','hazma
 IMAGES = {'structure-marking','heli-landing-area','one-way-helispot','two-way-helispot','longline','hand-signals','paracargo',
           'wind-estimate','smoke-column','look-up','safety-zones','hazard-tree','hazmat-isolation','triage','burns'}
 SPECIAL = {  # explicit pdf page lists (cover pages share one pdf page)
- 'sizeup-report':[2],'briefing-checklist':[139],'fire-orders':[140],'watch-outs':[140],
+ 'about':[3,138], 'sizeup-report':[2],'briefing-checklist':[139],'fire-orders':[140],'watch-outs':[140],
 }
+
+def roman(n):
+    return ['i','ii','iii','iv','v','vi','vii','viii','ix','x','xi','xii','xiii','xiv'][n-1]
+def printed(p):
+    # label as printed in the guide (arabic pages = pdf page - 16, front matter = roman)
+    if 17 <= p <= 137: return str(p - 16)
+    if 8 <= p <= 16: return roman(p - 3)
+    return {2:'inside front cover',3:'intro',138:'publication info',139:'inside back cover',140:'back cover'}.get(p, f'PDF p.{p}')
 
 def pdf_page(n, kind):
     return n + (ROMAN if kind == 'r' else ARABIC)
@@ -156,7 +165,7 @@ for sid, title, cat, n, kind in S:
     text = '\n\n'.join(page_text(p, sid not in MONO) for p in pages)
     if sid == 'fire-orders': text = text.split('18 WATCH OUT')[0].rstrip()
     if sid == 'watch-outs': text = '18 WATCH OUT' + text.split('18 WATCH OUT',1)[1]
-    sec = {'id': sid, 'title': title, 'category': cat, 'pages': f'{pages[0]}' if len(pages)==1 else f'{pages[0]}–{pages[-1]}', 'text': text}
+    sec = {'id': sid, 'title': title, 'category': cat, 'pages': printed(pages[0]) if len(pages)==1 else f'{printed(pages[0])}–{printed(pages[-1])}', 'text': text}
     if sid in MONO: sec['mono'] = True
     sec['images'] = [f'pages/p{p}.jpg' for p in pages]  # printed pages, always shown as a fallback to the extracted text
     # text with inline checkboxes, nested 'o'/'-' markers on one line, or unmappable glyphs doesn't reflow faithfully:
