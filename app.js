@@ -116,11 +116,12 @@ function render() {
     const imgs = (s.images || []).map(src => `<img class="page" loading="lazy" src="${src}" alt="IRPG page image: ${esc(s.title)}">`).join('');
     const heads = s.mono ? [] : s.text.split('\n').filter(l => l[0] === '\x01').map(l => l.slice(1).trim());
     const jump = s.images.length >= 3 && heads.length >= 4 ? '<div class="jump">' + heads.slice(1).map((h, i) => `<button class="chip" data-jump="${esc(h)}">${esc(h)}</button>`).join('') + '</div>' : '';
-    const body = s.mono ? `<pre class="mono">${esc(s.text.replace(/[○◦]/g, '-'))}</pre>` : flowHtml(s.text, s.id);
+    const isForm = s.id === 'medical-report' && window.MedForm;
+    const body = isForm ? window.MedForm.html() : s.mono ? `<pre class="mono">${esc(s.text.replace(/[○◦]/g, '-'))}</pre>` : flowHtml(s.text, s.id);
     const hasChecks = !s.mono && /[☐□]/.test(s.text);
     view.innerHTML = `<button class="fav-btn ${isFav(s.id) ? 'on' : ''}" data-id="${s.id}">${isFav(s.id) ? '★ Remove from Favorites' : '☆ Add to Favorites'}</button>` +
       (hasChecks ? `<button class="clear-btn" data-clear="${s.id}">Clear checkmarks</button>` : '') + jump + `<p class="src">${esc(s.category)} · IRPG ${/^(\d+|[ivx]+)(–|$)/.test(s.pages) ? 'p.' : ''} ${esc(s.pages)}</p>` + body +
-      `<details class="orig" ${s.openImages ? 'open' : ''}><summary>Original printed page${s.images.length > 1 ? 's' : ''} (check against text)</summary>${imgs}</details>`;
+      `<details class="orig" ${s.openImages && !isForm ? 'open' : ''}><summary>Original printed page${s.images.length > 1 ? 's' : ''} (check against ${isForm ? 'form' : 'text'})</summary>${imgs}</details>`;
   } else {
     titleEl.textContent = 'IRPG Companion';
     view.innerHTML = homeHtml(homeQuery) +
@@ -168,6 +169,7 @@ view.addEventListener('input', e => {
   const el = document.getElementById('search');
   el.focus(); el.setSelectionRange(el.value.length, el.value.length);
 });
+if (window.MedForm) window.MedForm.bind(view);
 window.addEventListener('hashchange', render);
 render();
 
