@@ -11,6 +11,13 @@ function loadFavs() {
 function saveFavs(f) {
   try { localStorage.setItem(KEY, JSON.stringify(f)); } catch (e) {}
 }
+const CK = 'irpg-checks';
+function loadChecks() {
+  try { return JSON.parse(localStorage.getItem(CK)) || {}; } catch (e) { return {}; }
+}
+function saveChecks(c) {
+  try { localStorage.setItem(CK, JSON.stringify(c)); } catch (e) {}
+}
 const isFav = id => loadFavs().includes(id);
 function toggleFav(id) {
   const f = loadFavs();
@@ -31,7 +38,19 @@ const listHtml = items => '<ul class="list">' + items.map(itemHtml).join('') + '
 // Turns the guide's page text into HTML. Bullets/checkboxes/numbers start items, lightly indented lines continue
 // the previous item, and anything else is a heading or paragraph line.
 const BULLET = /^\s{0,10}([•☐□○\-–]|\d{1,2}\.)\s+/;
-function flowHtml(text) {
+// Splits text on hollow checkbox glyphs: each ☐ starts a tickable item, anything before the first one is plain text.
+function pieces(s) {
+  return s.split(/\s*[☐□]\s*/).map((t, i) => ({ t: t.trim(), chk: i > 0 })).filter(p => p.t);
+}
+
+function flowHtml(text, sid) {
+  const checked = new Set((loadChecks()[sid] || []));
+  let n = 0;
+  const liHtml = (p, sub) => {
+    if (!p.chk) return `<li class="${sub ? 'sub' : ''}">${esc(p.t)}</li>`;
+    const i = n++;
+    return `<li class="chk${sub ? ' sub' : ''}"><label><input type="checkbox" data-ck="${i}" ${checked.has(i) ? 'checked' : ''}><span>${esc(p.t)}</span></label></li>`;
+  };
   const out = [];
   let cur = null;
   const flush = () => { if (cur) { out.push(cur); cur = null; } };
@@ -61,7 +80,7 @@ function flowHtml(text) {
     if (b.t === 'li') {
       if (!inList) { html += '<ul class="flow">'; inList = true; }
       const [first, ...subs] = b.s.split(/\s*[○◦]\s+/);  // inline hollow-circle markers are sub-bullets
-      html += `<li class="${b.sub ? 'sub' : ''}">${esc(first)}</li>` + subs.map(t => `<li class="sub">${esc(t)}</li>`).join('');
+      html += pieces(first).map(p => liHtml(p, b.sub)).join('') + subs.flatMap(pieces).map(p => liHtml(p, true)).join('');
     }
     else if (b.t === 'h') html += `<h3>${esc(b.s)}</h3>`;
     else html += `<p>${esc(b.s)}</p>`;
@@ -97,9 +116,10 @@ function render() {
     const imgs = (s.images || []).map(src => `<img class="page" loading="lazy" src="${src}" alt="IRPG page image: ${esc(s.title)}">`).join('');
     const heads = s.mono ? [] : s.text.split('\n').filter(l => l[0] === '\x01').map(l => l.slice(1).trim());
     const jump = s.images.length >= 3 && heads.length >= 4 ? '<div class="jump">' + heads.slice(1).map((h, i) => `<button class="chip" data-jump="${esc(h)}">${esc(h)}</button>`).join('') + '</div>' : '';
-    const body = s.mono ? `<pre class="mono">${esc(s.text.replace(/[○◦]/g, '-'))}</pre>` : flowHtml(s.text);
+    const body = s.mono ? `<pre class="mono">${esc(s.text.replace(/[○◦]/g, '-'))}</pre>` : flowHtml(s.text, s.id);
+    const hasChecks = !s.mono && /[☐□]/.test(s.text);
     view.innerHTML = `<button class="fav-btn ${isFav(s.id) ? 'on' : ''}" data-id="${s.id}">${isFav(s.id) ? '★ Remove from Favorites' : '☆ Add to Favorites'}</button>` +
-      jump + `<p class="src">${esc(s.category)} · IRPG ${/^(\d+|[ivx]+)(–|$)/.test(s.pages) ? 'p.' : ''} ${esc(s.pages)}</p>` + body +
+      (hasChecks ? `<button class="clear-btn" data-clear="${s.id}">Clear checkmarks</button>` : '') + jump + `<p class="src">${esc(s.category)} · IRPG ${/^(\d+|[ivx]+)(–|$)/.test(s.pages) ? 'p.' : ''} ${esc(s.pages)}</p>` + body +
       `<details class="orig" ${s.openImages ? 'open' : ''}><summary>Original printed page${s.images.length > 1 ? 's' : ''} (check against text)</summary>${imgs}</details>`;
   } else {
     titleEl.textContent = 'IRPG Companion';
@@ -109,7 +129,25 @@ function render() {
   window.scrollTo(0, 0);
 }
 
+view.addEventListener('change', e => {
+  const box = e.target.closest('input[data-ck]');
+  if (!box) return;
+  const sid = location.hash.replace(/^#\/?p\//, '');
+  const all = loadChecks();
+  const set = new Set(all[sid] || []);
+  if (box.checked) set.add(+box.dataset.ck); else set.delete(+box.dataset.ck);
+  if (set.size) all[sid] = [...set]; else delete all[sid];
+  saveChecks(all);
+});
 view.addEventListener('click', e => {
+  const clr = e.target.closest('button[data-clear]');
+  if (clr) {
+    const all = loadChecks();
+    delete all[clr.dataset.clear];
+    saveChecks(all);
+    view.querySelectorAll('input[data-ck]').forEach(b => { b.checked = false; });
+    return;
+  }
   const j = e.target.closest('button[data-jump]');
   if (j) {
     const h = [...view.querySelectorAll('h3')].find(x => x.textContent.trim().startsWith(j.dataset.jump.slice(0, 40)));

@@ -36,3 +36,9 @@ details.orig summary{font-size:.9rem;color:var(--muted);font-weight:600}
 .jump{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
 .chip{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:16px;padding:6px 12px;font-size:.85rem;cursor:pointer}
 h3{scroll-margin-top:70px}
+ul.flow li.chk{list-style:none;margin-left:-22px}
+ul.flow li.chk.sub{margin-left:0}
+ul.flow li.sub.chk::before{content:none}
+li.chk label{display:flex;gap:10px;align-items:flex-start;padding:4px 0;cursor:pointer}
+li.chk input{width:22px;height:22px;margin:1px 0 0;flex:none;accent-color:var(--accent)}
+.clear-btn{display:block;margin:0 0 10px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--muted);font-size:.85rem;cursor:pointer}
