@@ -28,9 +28,15 @@ function toggleFav(id) {
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+const ICONS = {
+  'Quick Reference': '📋', 'Operational Leadership': '🧭', 'Operational Engagement': '🔥', 'Specific Hazards': '⚠️',
+  'Fire Environment': '🌤️', 'All Hazard Response': '🚨', 'Aviation': '🚁', 'Other References': '📖', 'Emergency Medical Care': '🩺'
+};
+
 function itemHtml(s) {
   const on = isFav(s.id);
-  return `<li><a href="#/p/${s.id}">${esc(s.title)}</a>` +
+  return `<li><a class="ico" href="#/p/${s.id}" aria-hidden="true" tabindex="-1">${ICONS[s.category] || '📄'}</a>` +
+    `<a class="ttl" href="#/p/${s.id}">${esc(s.title)}</a>` +
     `<button class="star" data-id="${s.id}" aria-label="${on ? 'Remove from' : 'Add to'} favorites: ${esc(s.title)}">${on ? '★' : '☆'}</button></li>`;
 }
 const listHtml = items => '<ul class="list">' + items.map(itemHtml).join('') + '</ul>';
