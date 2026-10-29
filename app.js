@@ -39,14 +39,14 @@ function flowHtml(text) {
     if (!raw.trim()) { flush(); continue; }
     if (raw[0] === '\x01') {  // bold line in the guide = heading; consecutive heading lines are one heading
       const t = raw.slice(1).trim();
-      if (cur && cur.t === 'h') cur.s += ' ' + t; else { flush(); cur = { t: 'h', s: t }; }
+      if (cur && cur.t === 'h' && cur.s !== cur.s.toUpperCase()) cur.s += ' ' + t; else { flush(); cur = { t: 'h', s: t }; }
       continue;
     }
     const indent = raw.length - raw.trimStart().length;
     const line = raw.trim();
     if (BULLET.test(raw)) {
       flush();
-      cur = { t: 'li', s: line.replace(/^[•○\-–]\s+/, ''), sub: /^[○\-–]/.test(line) || indent > 2 };
+      cur = { t: 'li', s: line.replace(/^[•○◦\-–]\s+/, ''), sub: /^[○◦\-–]/.test(line) || indent > 2 };
     } else if (cur && (cur.t === 'p' || (cur.t === 'li' && indent >= 1))) {
       cur.s += ' ' + line;  // wrapped line of the same bullet (indented) or paragraph
     } else {
@@ -58,7 +58,11 @@ function flowHtml(text) {
   let html = '', inList = false;
   for (const b of out) {
     if (b.t !== 'li' && inList) { html += '</ul>'; inList = false; }
-    if (b.t === 'li') { if (!inList) { html += '<ul class="flow">'; inList = true; } html += `<li class="${b.sub ? 'sub' : ''}">${esc(b.s)}</li>`; }
+    if (b.t === 'li') {
+      if (!inList) { html += '<ul class="flow">'; inList = true; }
+      const [first, ...subs] = b.s.split(/\s*[○◦]\s+/);  // inline hollow-circle markers are sub-bullets
+      html += `<li class="${b.sub ? 'sub' : ''}">${esc(first)}</li>` + subs.map(t => `<li class="sub">${esc(t)}</li>`).join('');
+    }
     else if (b.t === 'h') html += `<h3>${esc(b.s)}</h3>`;
     else html += `<p>${esc(b.s)}</p>`;
   }
@@ -93,7 +97,7 @@ function render() {
     const imgs = (s.images || []).map(src => `<img class="page" loading="lazy" src="${src}" alt="IRPG page image: ${esc(s.title)}">`).join('');
     const heads = s.mono ? [] : s.text.split('\n').filter(l => l[0] === '\x01').map(l => l.slice(1).trim());
     const jump = s.images.length >= 3 && heads.length >= 4 ? '<div class="jump">' + heads.slice(1).map((h, i) => `<button class="chip" data-jump="${esc(h)}">${esc(h)}</button>`).join('') + '</div>' : '';
-    const body = s.mono ? `<pre class="mono">${esc(s.text)}</pre>` : flowHtml(s.text);
+    const body = s.mono ? `<pre class="mono">${esc(s.text.replace(/[○◦]/g, '-'))}</pre>` : flowHtml(s.text);
     view.innerHTML = `<button class="fav-btn ${isFav(s.id) ? 'on' : ''}" data-id="${s.id}">${isFav(s.id) ? '★ Remove from Favorites' : '☆ Add to Favorites'}</button>` +
       jump + `<p class="src">${esc(s.category)} · IRPG ${/^(\d+|[ivx]+)(–|$)/.test(s.pages) ? 'p.' : ''} ${esc(s.pages)}</p>` + body +
       `<details class="orig" ${s.openImages ? 'open' : ''}><summary>Original printed page${s.images.length > 1 ? 's' : ''} (check against text)</summary>${imgs}</details>`;
