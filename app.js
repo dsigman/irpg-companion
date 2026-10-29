@@ -1,3 +1,4 @@
+const APP_VERSION = '5 (' + window.DATA_VERSION + ')';
 const view = document.getElementById('view');
 const titleEl = document.getElementById('title');
 const KEY = 'irpg-favorites';
@@ -131,7 +132,7 @@ function render() {
   } else {
     titleEl.textContent = 'IRPG Companion';
     view.innerHTML = homeHtml(homeQuery) +
-      '<footer>Unofficial companion. Content from the NWCG Incident Response Pocket Guide (PMS 461, January 2025), a public domain NWCG publication. Not a substitute for the current guide: confirm at nwcg.gov/publications/pms461.</footer>';
+      '<footer>Unofficial companion. Content from the NWCG Incident Response Pocket Guide (PMS 461, January 2025), a public domain NWCG publication. Not a substitute for the current guide: confirm at nwcg.gov/publications/pms461.<br>App version ' + APP_VERSION + '</footer>';
   }
   window.scrollTo(0, 0);
 }
@@ -179,4 +180,12 @@ if (window.MedForm) window.MedForm.bind(view);
 window.addEventListener('hashchange', render);
 render();
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  // When a new version takes over, reload once so the page and its files are from the same release.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController && !reloaded) { reloaded = true; location.reload(); }
+  });
+  navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
+}
