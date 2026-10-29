@@ -16,3 +16,19 @@ ul.list a{flex:1;padding:16px;color:var(--fg);text-decoration:none;font-weight:6
 ol.steps li{margin-bottom:10px}
 .empty{color:var(--muted)}
 footer{padding:16px;text-align:center;color:var(--muted);font-size:.8rem}
+#search{width:100%;padding:12px;font-size:1rem;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);margin-bottom:8px}
+details{margin:0 0 10px}
+summary{font-weight:700;padding:12px 4px;cursor:pointer;list-style:none;color:var(--accent)}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸ "}
+details[open] summary::before{content:"▾ "}
+.count{color:var(--muted);font-weight:400;font-size:.85rem}
+.fav-link{display:inline-block;padding:8px 0;color:var(--accent);font-weight:600;text-decoration:none}
+.src{color:var(--muted);font-size:.85rem;margin:0 0 8px}
+h3{margin:18px 0 6px;font-size:1.05rem;color:var(--accent)}
+ul.flow{margin:6px 0;padding-left:22px}
+ul.flow li{margin-bottom:4px}
+ul.flow li.sub{margin-left:18px;list-style:circle}
+pre.mono{font:12.5px/1.35 ui-monospace,Menlo,monospace;overflow-x:auto;background:var(--card);padding:10px;border-radius:8px;white-space:pre}
+img.page{width:100%;height:auto;border:1px solid var(--line);border-radius:8px;margin:8px 0}
+details.orig summary{font-size:.9rem;color:var(--muted);font-weight:600}
