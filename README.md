@@ -6,4 +6,4 @@ All 93 sections of the January 2025 IRPG (text verbatim, plus page images for di
 Run locally: `python3 -m http.server` and open http://localhost:8000.
 Host on any static HTTPS host (GitHub Pages works). On iPhone: Share > Add to Home Screen.
 
-Regenerate content: `python3 tools/build_data.py IRPG.pdf` (needs poppler-utils). Source: NWCG IRPG PMS 461, public domain.
+Regenerate content: `python3 tools/build_data.py IRPG.pdf` then `python3 tools/table_recipes.py IRPG.pdf` (needs poppler-utils and pdfplumber). The second step rebuilds table pages (tables.js) and checks every word against the PDF. Source: NWCG IRPG PMS 461, public domain.

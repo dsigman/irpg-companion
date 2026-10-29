@@ -1,4 +1,4 @@
-const APP_VERSION = '9 (' + window.DATA_VERSION + ')';
+const APP_VERSION = '11 (' + window.DATA_VERSION + ')';
 const view = document.getElementById('view');
 const titleEl = document.getElementById('title');
 const KEY = 'irpg-favorites';
@@ -49,7 +49,7 @@ const O_BULLET = /^\s{1,10}o\s+(?=\S)/;  // 'o' used as a sub-bullet glyph
 const HEAD_JOIN_WORDS = /\b(in|of|and|or|the|for|to|on|with|a|an|at|by)$/i;
 function canJoinHeading(prev, next) {
   return !/[.?!:]$/.test(prev) && !/^\d+[.)]\s/.test(next) && prev !== prev.toUpperCase() &&
-    (/^[a-z]/.test(next) || HEAD_JOIN_WORDS.test(prev) || next.split(/\s+/).length <= 1);
+    (/\/$/.test(prev) || /^[a-z]/.test(next) || HEAD_JOIN_WORDS.test(prev) || next.split(/\s+/).length <= 1);
 }
 
 // Splits text on hollow checkbox glyphs: each ☐ starts a tickable item, anything before the first one is plain text.
@@ -100,7 +100,7 @@ function flowHtml(text, sid) {
       cur = { t: 'li', s: line.replace(/^[•○◦\-–]\s+/, ''), sub: /^[○◦\-–]/.test(line) || indent > 2 };
     } else if (cur && cur.t === 'li' && indent >= 1) {
       cur.s += ' ' + line;  // wrapped line of the same bullet
-    } else if (cur && cur.t === 'p' && (cur.last >= full || /^[a-z]/.test(line))) {
+    } else if (cur && cur.t === 'p' && (cur.last >= full || /^[a-z(]/.test(line))) {
       cur.s += ' ' + line; cur.last = line.length;  // wrapped line of the same paragraph
     } else {
       flush();
@@ -170,6 +170,31 @@ document.addEventListener('touchend', e => {
   }
 }, { passive: true });
 
+
+// Structured pages (tables, columns) from tables.js. 'cards' stack each row vertically, 'grid' is a real table,
+// 'columns' lists the side-by-side columns one after another so nothing needs sideways scrolling.
+const cell = c => esc(c).replace(/\n/g, '<br>');
+function blocksHtml(blocks, sid) {
+  return blocks.map(b => {
+    if (b.t === 'text') return flowHtml(b.text, sid).html;
+    if (b.t === 'images') return (b.note ? `<p class="src">${esc(b.note)}</p>` : '') +
+      b.images.map(src => `<a href="${src}" target="_blank" rel="noopener"><img class="page" loading="lazy" src="${src}" alt="IRPG table"></a>`).join('');
+    if (b.style === 'columns') {
+      return '<div class="cols">' + b.cols.map((c, i) => `<h4>${esc(b.head[i])}</h4><ul class="flow">${c.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`).join('') + '</div>';
+    }
+    if (b.style === 'grid') {
+      return '<div class="tbl"><table>' + (b.head ? `<thead><tr>${b.head.map(h => `<th>${cell(h)}</th>`).join('')}</tr></thead>` : '') +
+        '<tbody>' + b.rows.map(r => `<tr>${r.map(c => `<td>${cell(c)}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>';
+    }
+    // cards
+    if (b.single) {
+      return `<div class="card"><div class="card-t">${esc(b.title)}</div>` + b.rows.map(r => `<div class="card-r"><span class="lab">${esc(r[0])}</span> ${esc(r[1])}</div>`).join('') + '</div>';
+    }
+    return b.rows.map(r => `<div class="card"><div class="card-t">${cell(r[0])}</div>` +
+      r.slice(1).map((c, i) => `<div class="card-r">${b.head ? `<span class="lab">${esc(b.head[i + 1])}:</span> ` : ''}${cell(c)}</div>`).join('') + '</div>').join('');
+  }).join('');
+}
+
 function homeHtml(q) {
   q = q.trim().toLowerCase();
   const match = q ? sections.filter(s => (s.title + ' ' + s.text).toLowerCase().includes(q)) : sections;
@@ -202,6 +227,9 @@ function render() {
     if (isForm) {  // fill-in form; printed pages collapsed underneath for checking
       body = window.MedForm.html();
       tail = `<details class="orig"><summary>Original printed page${pl} (check against form)</summary>${imgs}</details>`;
+    } else if (window.TABLES && window.TABLES[s.id]) {  // tables rebuilt from the PDF; printed page stays one tap away
+      body = blocksHtml(window.TABLES[s.id], s.id);
+      tail = `<details class="orig"><summary>View original printed page${pl}</summary>${imgs}</details>`;
     } else if (s.mono) {  // tables / columns: the printed page is the reliable view, extracted text is secondary
       body = `<details class="orig" open><summary>Printed page${pl} (tap a page to zoom)</summary>${imgs}</details>`;
       tail = `<details class="orig"><summary>Text version (columns and tables may not line up)</summary><pre class="mono">${esc(s.text.replace(/[\x01\x02]/g, '').replace(/[○◦]/g, '-'))}</pre></details>`;

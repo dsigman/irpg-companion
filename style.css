@@ -85,3 +85,13 @@ details.orig a{display:block}
 .pn-btn span{font-weight:700;font-size:.95rem;line-height:1.2}
 .pn-next{text-align:right}
 .pn-btn:visited{color:#fff!important}
+
+.card{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:10px 12px;margin:0 0 10px}
+.card-t{font-weight:700;color:var(--accent);margin-bottom:4px}
+.card-r{margin:2px 0}
+.card-r .lab{font-weight:600}
+.tbl{overflow-x:auto;margin:8px 0}
+.tbl table{border-collapse:collapse;width:100%;font-size:.92rem}
+.tbl th,.tbl td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.tbl th{background:var(--card)}
+.cols h4{margin:14px 0 4px;color:var(--accent);font-size:1rem}
