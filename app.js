@@ -30,26 +30,28 @@ const listHtml = items => '<ul class="list">' + items.map(itemHtml).join('') + '
 
 // Turns the guide's page text into HTML. Bullets/checkboxes/numbers start items, lightly indented lines continue
 // the previous item, and anything else is a heading or paragraph line.
-const BULLET = /^\s{0,2}([•☐□○\-–]|\d{1,2}\.)\s+/;
+const BULLET = /^\s{0,10}([•☐□○\-–]|\d{1,2}\.)\s+/;
 function flowHtml(text) {
   const out = [];
   let cur = null;
   const flush = () => { if (cur) { out.push(cur); cur = null; } };
   for (const raw of text.split('\n')) {
     if (!raw.trim()) { flush(); continue; }
+    if (raw[0] === '\x01') {  // bold line in the guide = heading; consecutive heading lines are one heading
+      const t = raw.slice(1).trim();
+      if (cur && cur.t === 'h') cur.s += ' ' + t; else { flush(); cur = { t: 'h', s: t }; }
+      continue;
+    }
     const indent = raw.length - raw.trimStart().length;
     const line = raw.trim();
     if (BULLET.test(raw)) {
       flush();
-      cur = { t: 'li', s: line.replace(/^[•○\-–]\s+/, ''), sub: /^[○\-–]/.test(line) || indent > 1 };
-    } else if (cur && cur.t === 'li' && indent >= 1 && indent <= 6) {
-      cur.s += ' ' + line;
-    } else if (cur && cur.t === 'p' && indent < 6 && !(line.length < 45 && !/[.!?:]$/.test(line) && /[.!?:]$/.test(cur.s))) {
-      cur.s += ' ' + line;
+      cur = { t: 'li', s: line.replace(/^[•○\-–]\s+/, ''), sub: /^[○\-–]/.test(line) || indent > 2 };
+    } else if (cur && (cur.t === 'p' || (cur.t === 'li' && indent >= 1))) {
+      cur.s += ' ' + line;  // wrapped line of the same bullet (indented) or paragraph
     } else {
       flush();
-      cur = { t: line.length < 60 && !/[.:]$/.test(line) && indent >= 0 ? 'h' : 'p', s: line };
-      if (cur.t === 'h') { out.push(cur); cur = null; }
+      cur = { t: 'p', s: line };
     }
   }
   flush();

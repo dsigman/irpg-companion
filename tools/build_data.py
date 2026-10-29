@@ -129,11 +129,23 @@ for i, s in enumerate(body):
 NOISE = [re.compile(p) for p in (
     r'^\s*IRPG(\s+[–-].*)?\s*(\d+\s+of\s+122)?\s*$', r'^\s*IRPG\s+[ivx]+\s*$', r'^\s*\d+\s+of\s+122\s*$',
     r'^\s*[A-Z ]{4,}\s*\([a-z ]+ pages\)\s*$', r'^\s*\f?\s*$')]
-def page_text(n):
+def bold_lines(n):
+    # whole-element bold text on the page = headings; layout text lines equal to one of these get marked
+    x = subprocess.run(['pdftohtml','-xml','-i','-f',str(n),'-l',str(n),'-stdout',pdf],capture_output=True,text=True,check=True).stdout
+    found = set()
+    for m in re.finditer(r'<text [^>]*>\s*<b>(.*?)</b>\s*</text>', x):
+        t = ' '.join(re.sub(r'<[^>]+>', '', m.group(1)).replace('&amp;','&').replace('&#34;','"').replace('&lt;','<').replace('&gt;','>').split())
+        if t: found.add(t)
+    return found
+
+def page_text(n, mark=True):
     t = subprocess.run(['pdftotext','-f',str(n),'-l',str(n),'-layout',pdf,'-'],capture_output=True,text=True,check=True).stdout
     lines = [l.rstrip() for l in t.replace('\f','').split('\n')]
     # drop footer/header noise, keep blank lines inside the text
     keep = [l for l in lines if not (l.strip() and any(p.match(l) for p in NOISE))]
+    if mark:
+        bold = bold_lines(n)
+        keep = [('\x01' + l.strip()) if ' '.join(l.split()) in bold else l for l in keep]
     while keep and not keep[0].strip(): keep.pop(0)
     while keep and not keep[-1].strip(): keep.pop()
     return '\n'.join(keep)
@@ -141,13 +153,18 @@ def page_text(n):
 sections = []
 for sid, title, cat, n, kind in S:
     pages = SPECIAL.get(sid) or list(range(pdf_page(n, kind), ends[sid] + 1))
-    text = '\n\n'.join(page_text(p) for p in pages)
+    text = '\n\n'.join(page_text(p, sid not in MONO) for p in pages)
     if sid == 'fire-orders': text = text.split('18 WATCH OUT')[0].rstrip()
     if sid == 'watch-outs': text = '18 WATCH OUT' + text.split('18 WATCH OUT',1)[1]
     sec = {'id': sid, 'title': title, 'category': cat, 'pages': f'{pages[0]}' if len(pages)==1 else f'{pages[0]}–{pages[-1]}', 'text': text}
     if sid in MONO: sec['mono'] = True
     sec['images'] = [f'pages/p{p}.jpg' for p in pages]  # printed pages, always shown as a fallback to the extracted text
-    if sid in IMAGES or sid in MONO: sec['openImages'] = True
+    # text with inline checkboxes, nested 'o'/'-' markers on one line, or unmappable glyphs doesn't reflow faithfully:
+    # open the printed page by default so the reader sees the real layout
+    messy = any(len(re.findall(r'[\u2610\u25a1]', l)) > 1 or re.search(r'\s[o\u25cb\-]\s+[A-Z]', l) and l.lstrip()[:1] in '\u2610\u25a1\u2022\u25cb-' or re.search(r'[\ue000-\uf8ff]', l)
+                for l in text.split('\n'))
+    if sid in IMAGES or sid in MONO or messy: sec['openImages'] = True
+    if messy: print('  messy ->', sid)
     sections.append(sec)
 
 (out / 'pages').mkdir(exist_ok=True)
