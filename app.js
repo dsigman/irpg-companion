@@ -1,4 +1,4 @@
-const APP_VERSION = '8 (' + window.DATA_VERSION + ')';
+const APP_VERSION = '9 (' + window.DATA_VERSION + ')';
 const view = document.getElementById('view');
 const titleEl = document.getElementById('title');
 const KEY = 'irpg-favorites';
@@ -131,6 +131,45 @@ function flowHtml(text, sid) {
   return { html: html + (inList ? '</ul>' : ''), heads };
 }
 
+// Previous / next procedure in the guide's order, so a reader can keep going without returning to the home list.
+function neighbours(id) {
+  const i = sections.findIndex(x => x.id === id);
+  return { prev: sections[i - 1], next: sections[i + 1] };
+}
+function navHtml(id) {
+  const { prev, next } = neighbours(id);
+  return '<nav class="pn">' +
+    (prev ? `<a class="pn-btn" href="#/p/${prev.id}"><small>‹ Previous</small><span>${esc(prev.title)}</span></a>` : '<span></span>') +
+    (next ? `<a class="pn-btn pn-next" href="#/p/${next.id}"><small>Next ›</small><span>${esc(next.title)}</span></a>` : '<a class="pn-btn pn-next" href="#/"><small>End of guide</small><span>Back to home</span></a>') +
+    '</nav>';
+}
+
+// Swipe right-to-left on a procedure goes to the next one. Ignored inside form fields, tables that scroll
+// sideways, when pinch-zoomed in, and for mostly-vertical drags (normal scrolling).
+let touch = null;
+function scrollsSideways(el) {
+  for (; el && el !== document.body; el = el.parentElement) {
+    if (el.scrollWidth > el.clientWidth + 1 && /(auto|scroll)/.test(getComputedStyle(el).overflowX)) return true;
+  }
+  return false;
+}
+document.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  const inProc = location.hash.startsWith('#/p/');
+  const blocked = e.touches.length > 1 || !inProc || e.target.closest('input, textarea, select, .mf') || scrollsSideways(e.target) ||
+    (window.visualViewport && window.visualViewport.scale > 1.05);
+  touch = blocked ? null : { x: t.clientX, y: t.clientY, t: Date.now() };
+}, { passive: true });
+document.addEventListener('touchend', e => {
+  if (!touch) return;
+  const t = e.changedTouches[0], dx = t.clientX - touch.x, dy = t.clientY - touch.y, dt = Date.now() - touch.t;
+  touch = null;
+  if (dx < -80 && Math.abs(dx) > 2 * Math.abs(dy) && dt < 800) {
+    const { next } = neighbours(location.hash.replace(/^#\/p\//, ''));
+    if (next) location.hash = '#/p/' + next.id;
+  }
+}, { passive: true });
+
 function homeHtml(q) {
   q = q.trim().toLowerCase();
   const match = q ? sections.filter(s => (s.title + ' ' + s.text).toLowerCase().includes(q)) : sections;
@@ -175,7 +214,7 @@ function render() {
     const jump = s.images.length >= 3 && heads.length >= 4 ? '<div class="jump">' + heads.slice(1).map(h => `<button class="chip" data-jump="${esc(h)}">${esc(h)}</button>`).join('') + '</div>' : '';
     view.innerHTML = `<button class="fav-btn ${isFav(s.id) ? 'on' : ''}" data-id="${s.id}">${isFav(s.id) ? '★ Remove from Favorites' : '☆ Add to Favorites'}</button>` +
       (hasChecks ? `<button class="clear-btn" data-clear="${s.id}">Clear checkmarks</button>` : '') + jump +
-      `<p class="src">${esc(s.category)} · IRPG ${/^(\d+|[ivx]+)(–|$)/.test(s.pages) ? 'p.' : ''} ${esc(s.pages)}</p>` + body + tail;
+      `<p class="src">${esc(s.category)} · IRPG ${/^(\d+|[ivx]+)(–|$)/.test(s.pages) ? 'p.' : ''} ${esc(s.pages)}</p>` + body + tail + navHtml(s.id);
   } else {
     titleEl.innerHTML = '<img class="logo" src="icons/logo.png" alt="" width="40" height="40"><span>IRPG Companion</span>';
     view.innerHTML = homeHtml(homeQuery) +
